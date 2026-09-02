@@ -46,7 +46,7 @@ jobs:
             exit 1
           fi
 
-      - name: Smoke test (disabled mode runs the entrypoint normally)
+      - name: Smoke test (entrypoint runs and its output passes through)
         run: |
           mkdir -p /tmp/smoke && cd /tmp/smoke
           echo 'console.log("smoke-ok")' > index.js
@@ -54,11 +54,11 @@ jobs:
           echo "$OUTPUT"
           echo "$OUTPUT" | grep -q 'smoke-ok'
 
-      - name: Smoke test (debug mode serves DevTools over the web-server port)
+      - name: Smoke test (DevTools served over the web-server port)
         run: |
           mkdir -p /tmp/smoke-debug && cd /tmp/smoke-debug
           echo 'setTimeout(() => console.log("done"), 15000)' > index.js
-          APIFY_NODE_DEBUGGER=1 ACTOR_WEB_SERVER_PORT=4321 ACTOR_WEB_SERVER_URL=http://localhost:4321 \
+          ACTOR_WEB_SERVER_PORT=4321 ACTOR_WEB_SERVER_URL=http://localhost:4321 \
             node "$GITHUB_WORKSPACE/bin/cli.mjs" index.js &
           CLI_PID=$!
           for i in $(seq 1 20); do

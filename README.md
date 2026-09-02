@@ -11,6 +11,9 @@ CMD ["npx", "actor-debugger"]
 
 # or point at a specific entry:
 CMD ["npx", "actor-debugger", "dist/main.js"]
+
+# pause on the first line until a debugger attaches (for short-lived Actors):
+CMD ["npx", "actor-debugger", "--brk"]
 ```
 
 ## How it works
@@ -31,12 +34,12 @@ a *prebuilt* Chrome DevTools frontend. The `chrome-devtools-frontend` npm packag
 TypeScript source (needs Chromium's GN/ninja toolchain to compile), so it can't be served as-is —
 chii's build is the same frontend, ready to serve.
 
-## Activation (safe to leave in permanently)
+## Activation
 
-Debugging only turns on when the env var **`APIFY_NODE_DEBUGGER`** is truthy. Without it, the Actor
-runs normally (no inspector, no server), so the `CMD` line is safe in production — flip it on
-per-run by setting the env var in the Console or via the API. Set `APIFY_NODE_DEBUGGER_BRK=1` to
-pause on the first line until a debugger attaches.
+Running the Actor through `npx actor-debugger` **is** the switch — debugging is on whenever the
+`CMD` line above is in place. To turn it off, revert the `CMD` to the Actor's normal entrypoint
+(e.g. `CMD ["npm", "start"]`) and rebuild. Pass `--brk` to pause on the first line until a
+debugger attaches — useful for Actors that would otherwise finish before you connect.
 
 ## Connect
 
@@ -61,17 +64,18 @@ Prefer the raw channel? `npx wscat -c "wss://<run>.runs.apify.net/<uuid>"`, or p
 ## Security
 
 The debug endpoint is **unauthenticated** — anyone who reaches the container URL and the run's
-`uuid` can execute code in your run (and read its env, including `APIFY_TOKEN`). Only enable it on
-runs you are actively debugging, prefer a restricted run/token, never leave `APIFY_NODE_DEBUGGER`
-set on a published Actor, and gate the endpoint (owner-only) before any non-prototype use.
+`uuid` can execute code in your run (and read its env, including `APIFY_TOKEN`). Keep the
+`actor-debugger` `CMD` only in builds you are actively debugging, prefer a restricted run/token,
+never ship it in a published Actor, and gate the endpoint (owner-only) before any non-prototype
+use.
 
 ## Verified
 
 Tested end-to-end against a **browserless** generic sample TS Actor (`example-actor/`, plain
 `apify/actor-node`, no Chrome):
 
-- The one-line `CMD` detects the entrypoint and runs the Actor under `--inspect`; disabled/explicit
-  path/auto-detect modes all pass.
+- The one-line `CMD` detects the entrypoint and runs the Actor under `--inspect`; explicit path
+  and auto-detect modes both pass.
 - `/devtools/js_app.html` and its assets are served (200); `/json` is proxied; a CDP client
   round-trips `Runtime.evaluate` through the proxy with browser-like `Host`/`Origin`.
 - **Headless Chromium loaded the served DevTools frontend and the Node inspector reported
