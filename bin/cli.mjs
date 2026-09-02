@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * apify-node-debugger - launch an Apify Node/TS Actor under the Node inspector, reachable over the
+ * actor-debugger - launch an Apify Node/TS Actor under the Node inspector, reachable over the
  * run's container URL, with a one-line Dockerfile change:
  *
- *   CMD ["npx", "apify-node-debugger"]              # auto-detect the Actor's entrypoint
- *   CMD ["npx", "apify-node-debugger", "dist/x.js"] # explicit entrypoint
+ *   CMD ["npx", "actor-debugger"]                    # auto-detect the Actor's entrypoint
+ *   CMD ["npx", "actor-debugger", "dist/x.js"]       # explicit entrypoint
+ *   CMD ["npx", "actor-debugger", "--brk"]           # pause on the first line until attached
  *
- * Debugging only activates when the env var APIFY_NODE_DEBUGGER is set (truthy) - otherwise the
- * Actor runs normally, so the line is safe to leave in permanently. Set APIFY_NODE_DEBUGGER_BRK=1
- * to pause on the first line until a debugger attaches.
+ * Running through this command is what enables debugging - revert the CMD to the normal
+ * entrypoint to turn it off.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { startDebugServer } from '../lib/debug_server.mjs';
 
 const INSPECTOR_PORT = 9229;
-const TAG = '[apify-node-debugger]';
+const TAG = '[actor-debugger]';
 
 /** Locate chii's prebuilt Chrome DevTools frontend (chrome-devtools-frontend npm ships unbuilt source). */
 function findFrontendDir() {
@@ -36,10 +36,6 @@ function findFrontendDir() {
         }
     }
     return null;
-}
-
-function truthy(v) {
-    return v != null && v !== '' && v !== '0' && v.toLowerCase?.() !== 'false';
 }
 
 function resolveEntry(argEntry) {
@@ -105,37 +101,29 @@ async function announce(webServerUrl, hasFrontend) {
     console.error('='.repeat(72));
 }
 
-const entry = resolveEntry(process.argv[2]);
+const args = process.argv.slice(2);
+const brk = args.includes('--brk');
+const entry = resolveEntry(args.find((a) => !a.startsWith('--')));
 if (!entry) {
     console.error(`${TAG} could not find an Actor entrypoint. Pass one explicitly:`);
-    console.error(`${TAG}   CMD ["npx", "apify-node-debugger", "dist/main.js"]`);
+    console.error(`${TAG}   CMD ["npx", "actor-debugger", "dist/main.js"]`);
     process.exit(1);
 }
 
-const debugEnabled = truthy(process.env.APIFY_NODE_DEBUGGER);
-const nodeArgs = ['--enable-source-maps'];
-if (debugEnabled) {
-    const flag = truthy(process.env.APIFY_NODE_DEBUGGER_BRK) ? '--inspect-brk' : '--inspect';
-    nodeArgs.push(`${flag}=127.0.0.1:${INSPECTOR_PORT}`);
-}
-
-if (!debugEnabled) {
-    console.error(`${TAG} running ${path.relative(process.cwd(), entry)} normally (set APIFY_NODE_DEBUGGER=1 to debug).`);
-}
+const inspectFlag = brk ? '--inspect-brk' : '--inspect';
+const nodeArgs = ['--enable-source-maps', `${inspectFlag}=127.0.0.1:${INSPECTOR_PORT}`];
 
 const child = spawn(process.execPath, [...nodeArgs, entry], { stdio: 'inherit', env: process.env });
 
 let server;
-if (debugEnabled) {
-    const { ACTOR_WEB_SERVER_PORT: port, ACTOR_WEB_SERVER_URL: url } = process.env;
-    if (port && url) {
-        const frontendDir = findFrontendDir();
-        if (!frontendDir) console.error(`${TAG} DevTools frontend (chii) not found - serving CDP only, no UI.`);
-        server = startDebugServer({ listenPort: Number(port), inspectorPort: INSPECTOR_PORT, frontendDir });
-        announce(url, Boolean(frontendDir));
-    } else {
-        console.error(`${TAG} ACTOR_WEB_SERVER_URL/PORT not set - inspector on 127.0.0.1:${INSPECTOR_PORT} only (no container-URL bridge).`);
-    }
+const { ACTOR_WEB_SERVER_PORT: port, ACTOR_WEB_SERVER_URL: url } = process.env;
+if (port && url) {
+    const frontendDir = findFrontendDir();
+    if (!frontendDir) console.error(`${TAG} DevTools frontend (chii) not found - serving CDP only, no UI.`);
+    server = startDebugServer({ listenPort: Number(port), inspectorPort: INSPECTOR_PORT, frontendDir });
+    announce(url, Boolean(frontendDir));
+} else {
+    console.error(`${TAG} ACTOR_WEB_SERVER_URL/PORT not set - inspector on 127.0.0.1:${INSPECTOR_PORT} only (no container-URL bridge).`);
 }
 
 child.on('exit', (code, signal) => {
