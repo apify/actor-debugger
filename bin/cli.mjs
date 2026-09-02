@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * apify-node-debugger - launch an Apify Node/TS Actor under the Node inspector, reachable over the
+ * actor-debugger - launch an Apify Node/TS Actor under the Node inspector, reachable over the
  * run's container URL, with a one-line Dockerfile change:
  *
- *   CMD ["npx", "apify-node-debugger"]              # auto-detect the Actor's entrypoint
- *   CMD ["npx", "apify-node-debugger", "dist/x.js"] # explicit entrypoint
+ *   CMD ["npx", "actor-debugger"]              # auto-detect the Actor's entrypoint
+ *   CMD ["npx", "actor-debugger", "dist/x.js"] # explicit entrypoint
  *
  * Debugging only activates when the env var APIFY_NODE_DEBUGGER is set (truthy) - otherwise the
  * Actor runs normally, so the line is safe to leave in permanently. Set APIFY_NODE_DEBUGGER_BRK=1
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { startDebugServer } from '../lib/debug_server.mjs';
 
 const INSPECTOR_PORT = 9229;
-const TAG = '[apify-node-debugger]';
+const TAG = '[actor-debugger]';
 
 /** Locate chii's prebuilt Chrome DevTools frontend (chrome-devtools-frontend npm ships unbuilt source). */
 function findFrontendDir() {
@@ -108,7 +108,7 @@ async function announce(webServerUrl, hasFrontend) {
 const entry = resolveEntry(process.argv[2]);
 if (!entry) {
     console.error(`${TAG} could not find an Actor entrypoint. Pass one explicitly:`);
-    console.error(`${TAG}   CMD ["npx", "apify-node-debugger", "dist/main.js"]`);
+    console.error(`${TAG}   CMD ["npx", "actor-debugger", "dist/main.js"]`);
     process.exit(1);
 }
 

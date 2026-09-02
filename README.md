@@ -1,4 +1,4 @@
-# apify-node-debugger
+# actor-debugger
 
 Drop-in remote debugging for **any Apify Node/TS Actor** with a one-line Dockerfile change. It
 launches your Actor under the Node inspector **and serves a full Chrome DevTools UI over the run's
@@ -7,10 +7,10 @@ no rebuild of your source, and **no browser in the Actor**.
 
 ```dockerfile
 # auto-detect the Actor's entrypoint:
-CMD ["npx", "apify-node-debugger"]
+CMD ["npx", "actor-debugger"]
 
 # or point at a specific entry:
-CMD ["npx", "apify-node-debugger", "dist/main.js"]
+CMD ["npx", "actor-debugger", "dist/main.js"]
 ```
 
 ## How it works

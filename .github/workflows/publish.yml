@@ -1,4 +1,4 @@
-# Publishes apify-node-debugger to npm when a version tag is pushed.
+# Publishes actor-debugger to npm when a version tag is pushed.
 #
 # Release flow:
 #   npm version patch        # bumps package.json, commits, and creates the v* tag
