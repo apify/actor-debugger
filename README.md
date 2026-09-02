@@ -54,6 +54,22 @@ in your sources (via source maps), step, inspect — no `devtools://` URL, no lo
 Prefer the raw channel? `npx wscat -c "wss://<run>.runs.apify.net/<uuid>"`, or point
 `Playwright/Puppeteer connectOverCDP` at that wss URL.
 
+## TypeScript sources (automatic)
+
+A remote DevTools frontend can never fetch `file://` URLs from the container, so external
+`.js.map` files — the standard `"sourceMap": true` tsc output — are unreachable to it, and
+DevTools would fall back to the generated JS ("Source map failed to load"). The debugger fixes
+this itself at startup: it scans the compiled output, reads each external `.map` from the
+container's disk, embeds the original TS text into it (`sourcesContent`, read from the `.ts`
+files in the image), and rewrites the reference into an inline `data:` URL. Any tsc setup that
+emits source maps at all (`sourceMap` or `inlineSourceMap`) therefore just works — no tsconfig
+changes needed.
+
+The one unrecoverable case is a build with no source maps: then the run log prints a hint to
+compile with `"sourceMap": true`. If the `.ts` files aren't in the image (a multi-stage build
+copying only `dist/`), mappings still inline but sources can't be shown — the log says so; `COPY`
+your `src/` into the final stage to fix it.
+
 ## Entrypoint detection order
 
 1. An explicit path argument, if given.

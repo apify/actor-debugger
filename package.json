@@ -1,6 +1,6 @@
 {
     "name": "actor-debugger",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Drop-in remote debugger for Apify Node/TS Actors: one Dockerfile CMD line launches your Actor under the Node inspector, reachable over the run's container URL. No local setup, no rebuild of your own code.",
     "type": "module",
     "bin": {

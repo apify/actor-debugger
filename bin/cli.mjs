@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { startDebugServer } from '../lib/debug_server.mjs';
+import { inlineSourceMaps } from '../lib/inline_sourcemaps.mjs';
 
 const INSPECTOR_PORT = 9229;
 const TAG = '[actor-debugger]';
@@ -108,6 +109,19 @@ if (!entry) {
     console.error(`${TAG} could not find an Actor entrypoint. Pass one explicitly:`);
     console.error(`${TAG}   CMD ["npx", "actor-debugger", "dist/main.js"]`);
     process.exit(1);
+}
+
+// A remote DevTools frontend cannot fetch file:// URLs, so external .map files (and the .ts
+// sources they reference) are unreachable to it. Inline them into the compiled files up front.
+const mapRoot = path.resolve(path.dirname(entry)).startsWith(process.cwd()) ? process.cwd() : path.dirname(entry);
+const maps = inlineSourceMaps(mapRoot, (msg) => console.error(`${TAG} ${msg}`));
+if (maps.inlined > 0) {
+    console.error(`${TAG} inlined ${maps.inlined} source map(s) so DevTools can show original sources.`);
+    if (maps.missingSources > 0) {
+        console.error(`${TAG} ${maps.missingSources} original source file(s) not in the image - those stay JS-only. COPY your src/ into the image to fix.`);
+    }
+} else if (maps.alreadyInline === 0) {
+    console.error(`${TAG} no source maps found - TS Actors: compile with "sourceMap": true to debug original sources.`);
 }
 
 const inspectFlag = brk ? '--inspect-brk' : '--inspect';
