@@ -1,0 +1,93 @@
+# Publishes apify-node-debugger to npm when a version tag is pushed.
+#
+# Release flow:
+#   npm version patch        # bumps package.json, commits, and creates the v* tag
+#   git push --follow-tags
+#
+# Setup (one-time): create a granular npm access token with read/write on this
+# package (or "new packages" for the first publish) and save it as the
+# repository secret NPM_TOKEN.
+#
+# Note: `npm publish --provenance` is not used because it requires a public
+# repository. If the repo goes public, add `--provenance` to the publish step
+# and `id-token: write` to permissions.
+
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax-check sources
+        run: |
+          node --check bin/cli.mjs
+          node --check lib/debug_server.mjs
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Smoke test (disabled mode runs the entrypoint normally)
+        run: |
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          echo 'console.log("smoke-ok")' > index.js
+          OUTPUT="$(node "$GITHUB_WORKSPACE/bin/cli.mjs" index.js 2>&1)"
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q 'smoke-ok'
+
+      - name: Smoke test (debug mode serves DevTools over the web-server port)
+        run: |
+          mkdir -p /tmp/smoke-debug && cd /tmp/smoke-debug
+          echo 'setTimeout(() => console.log("done"), 15000)' > index.js
+          APIFY_NODE_DEBUGGER=1 ACTOR_WEB_SERVER_PORT=4321 ACTOR_WEB_SERVER_URL=http://localhost:4321 \
+            node "$GITHUB_WORKSPACE/bin/cli.mjs" index.js &
+          CLI_PID=$!
+          for i in $(seq 1 20); do
+            sleep 0.5
+            if curl -sf http://127.0.0.1:4321/json/list > /dev/null; then break; fi
+          done
+          curl -sf http://127.0.0.1:4321/json/list | grep -q '"id"'
+          curl -sf http://127.0.0.1:4321/devtools/js_app.html > /dev/null
+          kill $CLI_PID
+
+      - name: Check pack contents
+        run: npm pack --dry-run
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -82,6 +82,24 @@ One thing to confirm on real infrastructure: the frontend's `wss://` connection 
 ingress when the ingress negotiates HTTP/2 (WebSocket-over-h2). See the sibling
 `typescript-debug-browser` handoff for the `curl --http1.1` probe that settles it.
 
+## Releasing
+
+Publishing to npm is automated by [`.github/workflows/publish.yml`](.github/workflows/publish.yml),
+which fires on `v*` tags. To cut a release:
+
+```bash
+npm version patch   # or minor / major - bumps package.json, commits, tags vX.Y.Z
+git push --follow-tags
+```
+
+The workflow syntax-checks the sources, smoke-tests both modes (disabled pass-through and the
+debug server with `/json/list` + DevTools frontend), verifies the tag matches `package.json`
+`version`, and then runs `npm publish`.
+
+One-time setup: create a granular npm access token with publish rights for this package and save
+it as the repository secret `NPM_TOKEN`. The publish job runs in the `npm` GitHub environment, so
+you can optionally add required reviewers there to gate releases.
+
 ## Notes
 
 - Depends on `chii` for the prebuilt DevTools frontend (~16 MB of static assets, no runtime browser).

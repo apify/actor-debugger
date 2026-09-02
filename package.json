@@ -14,6 +14,26 @@
     "engines": {
         "node": ">=18"
     },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Pijukatel/actor-debugger.git"
+    },
+    "bugs": {
+        "url": "https://github.com/Pijukatel/actor-debugger/issues"
+    },
+    "homepage": "https://github.com/Pijukatel/actor-debugger#readme",
+    "keywords": [
+        "apify",
+        "actor",
+        "debugger",
+        "inspector",
+        "devtools",
+        "cdp",
+        "remote-debugging"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
     "license": "Apache-2.0",
     "dependencies": {
         "chii": "^1.14.0"
