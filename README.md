@@ -6,14 +6,14 @@ container URL** — so you open one link in your own browser and debug. No wstun
 no rebuild of your source, and **no browser in the Actor**.
 
 ```dockerfile
-# auto-detect the Actor's entrypoint:
-CMD ["npx", "actor-debugger"]
-
-# or point at a specific entry:
-CMD ["npx", "actor-debugger", "dist/main.js"]
+# Get the package
+RUN npm install actor-debugger --min-release-age=0
 
 # pause on the first line until a debugger attaches (for short-lived Actors):
 CMD ["npx", "actor-debugger", "--brk"]
+
+# or point at a specific entry:
+CMD ["npx", "actor-debugger", "dist/main.js"]
 ```
 
 ## How it works
