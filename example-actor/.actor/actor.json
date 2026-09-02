@@ -1,0 +1,1 @@
+{ "actorSpecification": 1, "name": "sample-ts-actor", "version": "0.0", "buildTag": "latest", "dockerfile": "./Dockerfile" }
