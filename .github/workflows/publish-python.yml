@@ -1,0 +1,95 @@
+# Publishes the Python actor-debugger package to PyPI when a py-v* tag is pushed.
+#
+# Release flow:
+#   (bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit)
+#   git tag py-vX.Y.Z && git push --tags
+#
+# Setup (one-time): create a PyPI API token scoped to this project (or an account token for the
+# first upload) and save it as the repository secret PYPI_TOKEN.
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'py-v*'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package
+        run: pip install .
+
+      - name: Verify tag matches pyproject version
+        run: |
+          PKG_VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          TAG_VERSION="${GITHUB_REF_NAME#py-v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Smoke test (entrypoint runs and its output passes through)
+        run: |
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          echo 'print("smoke-ok")' > main.py
+          OUTPUT="$(python -m actor_debugger 2>&1)"
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q 'smoke-ok'
+
+      - name: Smoke test (debugger UI served over the web-server port)
+        run: |
+          mkdir -p /tmp/smoke-debug && cd /tmp/smoke-debug
+          printf 'import time\ntime.sleep(15)\n' > main.py
+          ACTOR_WEB_SERVER_PORT=4321 ACTOR_WEB_SERVER_URL=http://localhost:4321 \
+            python -m actor_debugger main.py &
+          CLI_PID=$!
+          for i in $(seq 1 30); do
+            sleep 0.5
+            if curl -sf http://127.0.0.1:4321/config > /dev/null; then break; fi
+          done
+          curl -sf http://127.0.0.1:4321/config | grep -q '"cwd"'
+          curl -sf http://127.0.0.1:4321/ui/ | grep -q 'Actor Debugger'
+          kill $CLI_PID
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: pypi
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish
+        run: |
+          pip install twine
+          twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
