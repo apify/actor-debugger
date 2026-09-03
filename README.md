@@ -54,6 +54,10 @@ in your sources (via source maps), step, inspect — no `devtools://` URL, no lo
 Prefer the raw channel? `npx wscat -c "wss://<run>.runs.apify.net/<uuid>"`, or point
 `Playwright/Puppeteer connectOverCDP` at that wss URL.
 
+The WebSocket scheme in the printed URL follows the container URL's scheme: `wss` on the platform
+(https container URLs), plain `ws` on a local Apify dev stack (http on localhost). Always use the
+URL exactly as printed in the run log.
+
 ## TypeScript sources (automatic)
 
 A remote DevTools frontend can never fetch `file://` URLs from the container, so external
