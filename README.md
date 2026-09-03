@@ -7,7 +7,7 @@ no rebuild of your source, and **no browser in the Actor**.
 
 ```dockerfile
 # Get the package
-RUN npm install actor-debugger --min-release-age=0
+RUN npm install actor-debugger
 
 # pause on the first line until a debugger attaches (for short-lived Actors):
 CMD ["npx", "actor-debugger", "--brk"]
