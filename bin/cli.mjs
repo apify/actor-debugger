@@ -91,13 +91,18 @@ async function announce(webServerUrl, hasFrontend) {
     }
     const base = webServerUrl.replace(/\/$/, '');
     const host = base.replace(/^https?:\/\//, '');
+    // Match the WebSocket scheme to the container URL's scheme: the platform serves container URLs
+    // over https (-> wss), while the local dev stack serves plain http on localhost (-> ws). A wss
+    // attempt against a plain-http endpoint fails the TLS handshake and DevTools reports
+    // "WebSocket disconnected". Chii picks the scheme from the query param name (ws= vs wss=).
+    const wsScheme = base.startsWith('https://') ? 'wss' : 'ws';
     console.error('='.repeat(72));
     console.error(`${TAG} debugging is ON - reachable over the container URL.`);
     if (hasFrontend) {
         console.error(`${TAG} OPEN THIS in your local browser for a full DevTools UI (no local setup):`);
-        console.error(`${TAG}   ${base}/devtools/js_app.html?wss=${host}/${uuid}`);
+        console.error(`${TAG}   ${base}/devtools/js_app.html?${wsScheme}=${host}/${uuid}`);
     }
-    console.error(`${TAG} or verify the raw CDP channel: npx wscat -c "wss://${host}/${uuid}"`);
+    console.error(`${TAG} or verify the raw CDP channel: npx wscat -c "${wsScheme}://${host}/${uuid}"`);
     console.error(`${TAG}   then send {"id":1,"method":"Runtime.evaluate","params":{"expression":"2+2"}}`);
     console.error('='.repeat(72));
 }
