@@ -6,13 +6,16 @@ container URL** — so you open one link in your own browser and debug. No wstun
 no rebuild of your source, and **no browser in the Actor**.
 
 ```dockerfile
-# Get the package
-RUN npm install actor-debugger
+# Get the package (globally, so the Actor's own node_modules and lockfile are untouched)
+RUN npm install --global actor-debugger
 
-# pause on the first line until a debugger attaches (for short-lived Actors):
+# Recommended: wrap the image's existing CMD. Docker appends it to the ENTRYPOINT, so your real
+# start command is used as-is, and an ENTRYPOINT in your own Dockerfile can't swallow it.
+# `--brk` pauses on the first line until a debugger attaches (for short-lived Actors).
+ENTRYPOINT ["actor-debugger", "--brk"]
+
+# Or replace the CMD instead - the entrypoint is then auto-detected, or given explicitly:
 CMD ["npx", "actor-debugger", "--brk"]
-
-# or point at a specific entry:
 CMD ["npx", "actor-debugger", "dist/main.js"]
 ```
 
@@ -36,10 +39,10 @@ chii's build is the same frontend, ready to serve.
 
 ## Activation
 
-Running the Actor through `npx actor-debugger` **is** the switch — debugging is on whenever the
-`CMD` line above is in place. To turn it off, revert the `CMD` to the Actor's normal entrypoint
-(e.g. `CMD ["npm", "start"]`) and rebuild. Pass `--brk` to pause on the first line until a
-debugger attaches — useful for Actors that would otherwise finish before you connect.
+Running the Actor through `actor-debugger` **is** the switch — debugging is on whenever the
+`ENTRYPOINT` (or `CMD`) line above is in place. To turn it off, drop that line and rebuild. Pass
+`--brk` to pause on the first line until a debugger attaches — useful for Actors that would
+otherwise finish before you connect.
 
 ## Connect
 
@@ -76,10 +79,33 @@ your `src/` into the final stage to fix it.
 
 ## Entrypoint detection order
 
-1. An explicit path argument, if given.
-2. The file in `package.json` `scripts.start` (e.g. `node dist/main.js` → `dist/main.js`).
-3. `package.json` `main`.
-4. Conventional paths: `dist/main.js`, `dist/index.js`, `build/main.js`, `src/main.js`, `main.js`, `index.js`.
+Anything after `--brk` is treated as the Actor's start command. As `ENTRYPOINT`, that is the image's
+own `CMD`, appended by Docker — so the Actor starts the way it normally does, with its Node flags and
+arguments intact, instead of being guessed at.
+
+Understood start commands:
+
+| Passed-through command | Resolves to |
+| --- | --- |
+| `node [flags] <script> [args]` | that script, keeping flags (incl. `-r x`/`--import x`) and args |
+| `npm start`, `npm run <s>`, `pnpm …`, `yarn …` | the matching `package.json` script, parsed again |
+| `sh -c "<command>"` | the inner command, parsed again |
+| `dist/main.js` | that file directly (the explicit-path form) |
+
+Chained scripts are handled by trying the segments from the last back, so `npm run build && node
+dist/main.js` debugs `dist/main.js` rather than the build step.
+
+With **no** command passed (the plain `CMD ["npx", "actor-debugger"]` form), the entrypoint is
+auto-detected instead:
+
+1. The file in `package.json` `scripts.start` (e.g. `node dist/main.js` → `dist/main.js`).
+2. `package.json` `main`.
+3. Conventional paths: `dist/main.js`, `dist/index.js`, `build/main.js`, `src/main.js`, `main.js`, `index.js`.
+
+If a command is passed but no Node.js entrypoint can be derived from it (e.g. a `tsx`/`ts-node`
+launcher), the debugger **fails fast** with the reason rather than starting the Actor without a
+debugger attached — a run you asked to debug should not silently run undebuggable. Pass the
+entrypoint explicitly in that case: `ENTRYPOINT ["actor-debugger", "--brk", "dist/main.js"]`.
 
 ## Security
 
