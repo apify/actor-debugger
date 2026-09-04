@@ -36,6 +36,11 @@ jobs:
         run: |
           node --check bin/cli.mjs
           node --check lib/debug_server.mjs
+          node --check lib/inline_sourcemaps.mjs
+          node --check lib/resolve_launch.mjs
+
+      - name: Unit tests
+        run: npm test
 
       - name: Verify tag matches package.json version
         run: |
