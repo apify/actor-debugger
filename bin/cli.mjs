@@ -82,8 +82,8 @@ async function announce(webServerUrl, hasFrontend) {
     const base = webServerUrl.replace(/\/$/, '');
     const host = base.replace(/^https?:\/\//, '');
     // Match the WebSocket scheme to the container URL's scheme: the platform serves container URLs
-    // over https (-> wss), while the local dev stack serves plain http on localhost (-> ws). A wss
-    // attempt against a plain-http endpoint fails the TLS handshake and DevTools reports
+    // over https (-> wss), while the local dev stack serves plain http on localhost (-> ws).
+    // A wss attempt against a plain-http endpoint fails the TLS handshake and DevTools reports
     // "WebSocket disconnected". Chii picks the scheme from the query param name (ws= vs wss=).
     const wsScheme = base.startsWith('https://') ? 'wss' : 'ws';
     console.error('='.repeat(72));
