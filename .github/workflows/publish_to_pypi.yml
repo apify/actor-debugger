@@ -9,6 +9,10 @@
 # Release flow:
 #   (bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit)
 #   git tag py-vX.Y.Z && git push --tags
+#
+# Can also be started manually (Actions -> Publish to PyPI -> Run workflow); a manual run
+# skips the tag/version check and publishes whatever version pyproject.toml carries on the
+# chosen ref (PyPI rejects re-uploads of an existing version, so re-runs are safe).
 
 name: Publish to PyPI
 
@@ -16,6 +20,7 @@ on:
   push:
     tags:
       - 'py-v*'
+  workflow_dispatch:
 
 jobs:
   check:
@@ -34,6 +39,7 @@ jobs:
         run: pip install .
 
       - name: Verify tag matches pyproject version
+        if: github.ref_type == 'tag'
         run: |
           PKG_VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
           TAG_VERSION="${GITHUB_REF_NAME#py-v}"
