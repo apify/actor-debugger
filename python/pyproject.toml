@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "actor-debugger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Drop-in remote debugging for Apify Python Actors: debugpy plus a browser debugger UI served over the run's container URL."
 readme = "README.md"
 license = { text = "Apache-2.0" }

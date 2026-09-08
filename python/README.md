@@ -47,8 +47,16 @@ CMD ["python3", "-m", "actor_debugger", "main.py"]   # explicit file
 (`actor-debugger` also works as a console command; the `python3 -m` form is immune to PATH
 surprises in slim images.)
 
-Entrypoint detection order: explicit `-m <module>`/`<file.py>` argument → `src/__main__.py`
-(the Apify template's `python3 -m src`) → `src/main.py` → `main.py` / `__main__.py` / `app.py`.
+Entrypoint detection: an explicit `-m <module>` / `<file.py>` argument always wins. Otherwise the
+launcher scans the working directory for **runnable packages** (top-level directories with a
+`__main__.py`) — by shape, not by name — which covers every current Apify Python template
+(`my_actor/`), older ones (`src/`), and Crawlee-generated projects, whose package is named after
+your project. The `apify/actor-python` base image ships a placeholder `src/` package ("replace
+this file with your actual application code") that exists in every derived image — it is
+recognized by content and skipped. With several real runnable packages, `src` and `my_actor` are
+preferred, otherwise the log lists the candidates and asks for an explicit `-m`. Flat layouts
+fall back to `src/main.py` → `main.py` / `__main__.py` / `app.py`. The run log always prints
+`entrypoint: …` so a wrong pick is immediately visible.
 
 ## How it works
 

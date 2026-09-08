@@ -30,6 +30,44 @@ def log(message: str) -> None:
     print(f"{TAG} {message}", file=sys.stderr, flush=True)
 
 
+# The apify/actor-python base image ships a placeholder src/ package (default CMD is
+# `python -m src`) that only prints a "replace this file" warning - it exists in EVERY
+# image built on that base, so auto-detection must never mistake it for the Actor's code.
+_PLACEHOLDER_MARKER = b"set up your Docker image correctly"
+
+
+def _is_placeholder(*paths: str) -> bool:
+    for path in paths:
+        try:
+            with open(path, "rb") as f:
+                if _PLACEHOLDER_MARKER in f.read(65536):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def _runnable_packages() -> list[str]:
+    """Top-level packages that `python -m <name>` can run, excluding placeholders.
+
+    Covers every current Apify Python template (`my_actor/`), older ones (`src/`), and
+    Crawlee-generated projects, whose package is named after the project - so the scan is
+    by shape (a directory with __main__.py), not by name.
+    """
+    found = []
+    for name in sorted(os.listdir(".")):
+        if name.startswith(".") or name in ("__pycache__", "actor_debugger", "node_modules", "storage"):
+            continue
+        main_file = os.path.join(name, "__main__.py")
+        if not os.path.isfile(main_file):
+            continue
+        if _is_placeholder(main_file, os.path.join(name, "main.py")):
+            log(f"ignored -m {name}: it is the apify/actor-python base-image placeholder, not your code.")
+            continue
+        found.append(name)
+    return found
+
+
 def resolve_entry(args: list[str]) -> list[str] | None:
     """Return the argv tail (["-m", "pkg"] or ["path.py"]) for the Actor's entrypoint."""
     if "-m" in args:
@@ -39,13 +77,27 @@ def resolve_entry(args: list[str]) -> list[str] | None:
     positional = [a for a in args if not a.startswith("-")]
     if positional:
         return [os.path.abspath(positional[0])]
-    # The Apify Python templates run `python3 -m src` (src/__main__.py + src/main.py).
-    if os.path.isfile("src/__main__.py"):
-        return ["-m", "src"]
-    if os.path.isfile("src/main.py"):
+
+    packages = _runnable_packages()
+    if len(packages) == 1:
+        return ["-m", packages[0]]
+    if len(packages) > 1:
+        # Prefer the template conventions when a project carries several runnable packages.
+        for preferred in ("src", "my_actor"):
+            if preferred in packages:
+                log(f"multiple runnable packages found ({', '.join(packages)}); picking -m {preferred}.")
+                return ["-m", preferred]
+        log(f"multiple runnable packages found: {', '.join(packages)} - pass one explicitly:")
+        log(f'  CMD ["python3", "-m", "actor_debugger", "-m", "{packages[0]}"]')
+        return None
+
+    if os.path.isfile("src/main.py") and not _is_placeholder("src/main.py"):
         return ["-m", "src.main"]
     for candidate in ("main.py", "__main__.py", "app.py"):
         if os.path.isfile(candidate):
+            if _is_placeholder(candidate):
+                log(f"ignored {candidate}: it is the apify/actor-python base-image placeholder, not your code.")
+                continue
             return [os.path.abspath(candidate)]
     return None
 
@@ -100,9 +152,11 @@ def main() -> None:
     brk = "--brk" in args
     entry = resolve_entry([a for a in args if a != "--brk"])
     if not entry:
-        log("could not find an Actor entrypoint. Pass one explicitly:")
+        log("could not find an Actor entrypoint. Pass one explicitly, e.g.:")
         log('  CMD ["python3", "-m", "actor_debugger", "-m", "src"]')
+        log('  CMD ["python3", "-m", "actor_debugger", "server.py"]')
         sys.exit(1)
+    log(f"entrypoint: {' '.join(entry)}")
 
     debugpy_argv = [
         sys.executable,
