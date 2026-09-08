@@ -18,6 +18,9 @@ CMD ["npx", "actor-debugger", "dist/main.js"]
 
 ## How it works
 
+For a full walkthrough with diagrams (boot sequence, the CDP bridge, why the DevTools UI is
+served from the container, source-map inlining), see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 1. It resolves your Actor's entrypoint (see detection order below) and launches it as
    `node --inspect=127.0.0.1:9229 <entry>` — so the inspector is on **your** code, in its own
    process, exactly as it normally runs.
