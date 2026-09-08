@@ -1,2 +1,2 @@
-apify
-actor-debugger
+apify<3.0.0
+debugpy>=1.8

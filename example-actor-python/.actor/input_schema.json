@@ -1,0 +1,15 @@
+{
+    "title": "Python browser-debugger demo",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "ticks": {
+            "title": "Ticks",
+            "type": "integer",
+            "description": "How many 2-second processing ticks to run before finishing (keeps the run alive while you debug).",
+            "default": 120,
+            "minimum": 1,
+            "maximum": 10000
+        }
+    }
+}
