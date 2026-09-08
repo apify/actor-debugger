@@ -1,5 +1,10 @@
 # actor-debugger
 
+> **Python Actors:** the same one-link browser debugging exists for Python, injected the same way —
+> `RUN pip install actor-debugger` + `CMD ["python3", "-m", "actor_debugger", "--brk"]` — built on
+> debugpy plus a served DAP frontend instead of the Node inspector plus Chrome DevTools.
+> See [`python/README.md`](python/README.md).
+
 Drop-in remote debugging for **any Apify Node/TS Actor** with a one-line Dockerfile change. It
 launches your Actor under the Node inspector **and serves a full Chrome DevTools UI over the run's
 container URL** — so you open one link in your own browser and debug. No wstunnel, no local setup,
