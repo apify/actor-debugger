@@ -49,6 +49,10 @@ surprises in slim images.)
 
 Entrypoint detection order: explicit `-m <module>`/`<file.py>` argument → `src/__main__.py`
 (the Apify template's `python3 -m src`) → `src/main.py` → `main.py` / `__main__.py` / `app.py`.
+The `apify/actor-python` base image ships a placeholder `src/` package ("replace this file with
+your actual application code") that exists in every derived image — auto-detection recognizes and
+skips it, and the run log always prints which entrypoint was resolved. If your Actor's entry has
+a non-standard name, pass it explicitly (`-m mypackage` or `path/to/entry.py`).
 
 ## How it works
 

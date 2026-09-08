@@ -30,6 +30,23 @@ def log(message: str) -> None:
     print(f"{TAG} {message}", file=sys.stderr, flush=True)
 
 
+# The apify/actor-python base image ships a placeholder src/ package (default CMD is
+# `python -m src`) that only prints a "replace this file" warning - it exists in EVERY
+# image built on that base, so auto-detection must never mistake it for the Actor's code.
+_PLACEHOLDER_MARKER = b"set up your Docker image correctly"
+
+
+def _is_placeholder(*paths: str) -> bool:
+    for path in paths:
+        try:
+            with open(path, "rb") as f:
+                if _PLACEHOLDER_MARKER in f.read(65536):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
 def resolve_entry(args: list[str]) -> list[str] | None:
     """Return the argv tail (["-m", "pkg"] or ["path.py"]) for the Actor's entrypoint."""
     if "-m" in args:
@@ -39,14 +56,22 @@ def resolve_entry(args: list[str]) -> list[str] | None:
     positional = [a for a in args if not a.startswith("-")]
     if positional:
         return [os.path.abspath(positional[0])]
+    skipped_placeholders = []
     # The Apify Python templates run `python3 -m src` (src/__main__.py + src/main.py).
-    if os.path.isfile("src/__main__.py"):
-        return ["-m", "src"]
-    if os.path.isfile("src/main.py"):
-        return ["-m", "src.main"]
+    for module, files in (("src", ("src/__main__.py",)), ("src.main", ("src/main.py",))):
+        if all(os.path.isfile(f) for f in files):
+            if _is_placeholder("src/__main__.py", "src/main.py"):
+                skipped_placeholders.append(f"-m {module}")
+                break  # both src candidates are the same placeholder package
+            return ["-m", module]
     for candidate in ("main.py", "__main__.py", "app.py"):
         if os.path.isfile(candidate):
+            if _is_placeholder(candidate):
+                skipped_placeholders.append(candidate)
+                continue
             return [os.path.abspath(candidate)]
+    for skipped in skipped_placeholders:
+        log(f"ignored {skipped}: it is the apify/actor-python base-image placeholder, not your code.")
     return None
 
 
@@ -100,9 +125,11 @@ def main() -> None:
     brk = "--brk" in args
     entry = resolve_entry([a for a in args if a != "--brk"])
     if not entry:
-        log("could not find an Actor entrypoint. Pass one explicitly:")
+        log("could not find an Actor entrypoint. Pass one explicitly, e.g.:")
         log('  CMD ["python3", "-m", "actor_debugger", "-m", "src"]')
+        log('  CMD ["python3", "-m", "actor_debugger", "server.py"]')
         sys.exit(1)
+    log(f"entrypoint: {' '.join(entry)}")
 
     debugpy_argv = [
         sys.executable,
