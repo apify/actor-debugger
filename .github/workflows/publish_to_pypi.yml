@@ -1,11 +1,14 @@
 # Publishes the Python actor-debugger package to PyPI when a py-v* tag is pushed.
 #
+# Uses PyPI Trusted Publishing (OIDC) - no API token or secret anywhere. The trusted
+# publisher on PyPI is configured as:
+#   project:    actor-debugger
+#   repository: apify/actor-debugger
+#   workflow:   publish_to_pypi.yml   (this file name must match exactly)
+#
 # Release flow:
 #   (bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit)
 #   git tag py-vX.Y.Z && git push --tags
-#
-# Setup (one-time): create a PyPI API token scoped to this project (or an account token for the
-# first upload) and save it as the repository secret PYPI_TOKEN.
 
 name: Publish to PyPI
 
@@ -62,18 +65,11 @@ jobs:
           curl -sf http://127.0.0.1:4321/ui/ | grep -q 'Actor Debugger'
           kill $CLI_PID
 
-      - name: Build distributions
-        run: |
-          pip install build
-          python -m build
-
   publish:
     needs: check
     runs-on: ubuntu-latest
-    environment: pypi
-    defaults:
-      run:
-        working-directory: python
+    permissions:
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
     steps:
       - uses: actions/checkout@v4
 
@@ -82,14 +78,12 @@ jobs:
           python-version: '3.11'
 
       - name: Build distributions
+        working-directory: python
         run: |
           pip install build
           python -m build
 
-      - name: Publish
-        run: |
-          pip install twine
-          twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist

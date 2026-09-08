@@ -118,8 +118,11 @@ bridge and frontend; only the adapter spawn command and entrypoint detection dif
 ## Releasing
 
 Publishing to PyPI is automated by
-[`.github/workflows/publish-python.yml`](../.github/workflows/publish-python.yml), which fires on
-`py-v*` tags. To cut a release:
+[`.github/workflows/publish_to_pypi.yml`](../.github/workflows/publish_to_pypi.yml), which fires
+on `py-v*` tags and publishes via **PyPI Trusted Publishing** (OIDC) — no API token or repository
+secret. The trusted publisher configured on PyPI is: project `actor-debugger`, repository
+`apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay exactly
+that). To cut a release:
 
 ```bash
 # bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit, then:
@@ -127,10 +130,9 @@ git tag py-v0.1.0
 git push --tags
 ```
 
-One-time setup: create a PyPI API token for the project (or an account-scoped token for the very
-first upload, which claims the `actor-debugger` name) and save it as the repository secret
-`PYPI_TOKEN`. The publish job runs in the `pypi` GitHub environment, so you can add required
-reviewers there to gate releases.
+The workflow first installs the package, checks the tag matches the pyproject version, and smoke
+tests the CLI and the served debugger UI; only then does the publish job build sdist+wheel and
+upload.
 
 ## Notes
 
