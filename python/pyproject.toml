@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Pijukatel/actor-debugger"
+Homepage = "https://github.com/apify/actor-debugger"
 
 [project.scripts]
 actor-debugger = "actor_debugger.cli:main"
