@@ -47,6 +47,27 @@ def _is_placeholder(*paths: str) -> bool:
     return False
 
 
+def _runnable_packages() -> list[str]:
+    """Top-level packages that `python -m <name>` can run, excluding placeholders.
+
+    Covers every current Apify Python template (`my_actor/`), older ones (`src/`), and
+    Crawlee-generated projects, whose package is named after the project - so the scan is
+    by shape (a directory with __main__.py), not by name.
+    """
+    found = []
+    for name in sorted(os.listdir(".")):
+        if name.startswith(".") or name in ("__pycache__", "actor_debugger", "node_modules", "storage"):
+            continue
+        main_file = os.path.join(name, "__main__.py")
+        if not os.path.isfile(main_file):
+            continue
+        if _is_placeholder(main_file, os.path.join(name, "main.py")):
+            log(f"ignored -m {name}: it is the apify/actor-python base-image placeholder, not your code.")
+            continue
+        found.append(name)
+    return found
+
+
 def resolve_entry(args: list[str]) -> list[str] | None:
     """Return the argv tail (["-m", "pkg"] or ["path.py"]) for the Actor's entrypoint."""
     if "-m" in args:
@@ -56,22 +77,28 @@ def resolve_entry(args: list[str]) -> list[str] | None:
     positional = [a for a in args if not a.startswith("-")]
     if positional:
         return [os.path.abspath(positional[0])]
-    skipped_placeholders = []
-    # The Apify Python templates run `python3 -m src` (src/__main__.py + src/main.py).
-    for module, files in (("src", ("src/__main__.py",)), ("src.main", ("src/main.py",))):
-        if all(os.path.isfile(f) for f in files):
-            if _is_placeholder("src/__main__.py", "src/main.py"):
-                skipped_placeholders.append(f"-m {module}")
-                break  # both src candidates are the same placeholder package
-            return ["-m", module]
+
+    packages = _runnable_packages()
+    if len(packages) == 1:
+        return ["-m", packages[0]]
+    if len(packages) > 1:
+        # Prefer the template conventions when a project carries several runnable packages.
+        for preferred in ("src", "my_actor"):
+            if preferred in packages:
+                log(f"multiple runnable packages found ({', '.join(packages)}); picking -m {preferred}.")
+                return ["-m", preferred]
+        log(f"multiple runnable packages found: {', '.join(packages)} - pass one explicitly:")
+        log(f'  CMD ["python3", "-m", "actor_debugger", "-m", "{packages[0]}"]')
+        return None
+
+    if os.path.isfile("src/main.py") and not _is_placeholder("src/main.py"):
+        return ["-m", "src.main"]
     for candidate in ("main.py", "__main__.py", "app.py"):
         if os.path.isfile(candidate):
             if _is_placeholder(candidate):
-                skipped_placeholders.append(candidate)
+                log(f"ignored {candidate}: it is the apify/actor-python base-image placeholder, not your code.")
                 continue
             return [os.path.abspath(candidate)]
-    for skipped in skipped_placeholders:
-        log(f"ignored {skipped}: it is the apify/actor-python base-image placeholder, not your code.")
     return None
 
 
