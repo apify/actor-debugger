@@ -5,7 +5,7 @@ walk the call stack, inspect variables and evaluate expressions in the paused fr
 tab, straight from the run detail in Apify Console. No IDE, no tunnel, no SSH, nothing to install
 on your machine.
 
-![Actor Debugger paused on a breakpoint in a Python Actor, shown in the Live view tab of a run in Apify Console: sources, call stack, variables and an evaluate prompt](https://raw.githubusercontent.com/apify/actor-debugger/master/python/docs/apify-console-live-view.png)
+![Actor Debugger paused on a breakpoint in a Python Actor, shown in the Live view tab of a run in Apify Console: sources, call stack, variables and an evaluate prompt](https://raw.githubusercontent.com/apify/actor-debugger/master/python/docs/apify-console-live-view.jpg)
 
 *A Crawlee `BeautifulSoupCrawler` Actor paused on `await context.push_data(data)` in the **Live view**
 tab of its run in Apify Console. Sources on the left, call stack and locals on the right (the scraped
