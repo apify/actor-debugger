@@ -6,8 +6,8 @@ serves a full browser debugger UI over the run's container URL** — so you open
 own browser and debug. No IDE, no tunnel, no local setup, no rebuild of your source, and **no
 browser or IDE inside the Actor**.
 
-This is the Python sibling of the Node/TS [`actor-debugger`](../README.md) npm package, injected
-the same way:
+This is the Python sibling of the Node/TS [`actor-debugger`](https://github.com/apify/actor-debugger/blob/master/javascript/README.md)
+npm package, injected the same way:
 
 ```dockerfile
 # Get the package
@@ -29,7 +29,7 @@ Open it: click line numbers to set breakpoints, step, inspect the call stack and
 evaluate expressions in the paused frame, break on exceptions. `--brk` pauses the Actor on its
 first line until you attach — drop it to let the Actor run and attach mid-flight instead.
 
-Until the package is published to PyPI, install it from the repository instead:
+To try unreleased changes, install straight from the repository instead:
 
 ```dockerfile
 RUN pip install "actor-debugger @ git+https://github.com/apify/actor-debugger.git@master#subdirectory=python"
@@ -126,7 +126,7 @@ bridge and frontend; only the adapter spawn command and entrypoint detection dif
 ## Releasing
 
 Publishing to PyPI is automated by
-[`.github/workflows/publish_to_pypi.yml`](../.github/workflows/publish_to_pypi.yml), which fires
+[`.github/workflows/publish_to_pypi.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish_to_pypi.yml), which fires
 on `py-v*` tags and publishes via **PyPI Trusted Publishing** (OIDC) — no API token or repository
 secret. The trusted publisher configured on PyPI is: project `actor-debugger`, repository
 `apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay exactly

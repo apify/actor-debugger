@@ -1,16 +1,15 @@
-# Publishes actor-debugger to npm when a version tag is pushed.
+# Publishes the npm package in javascript/ when a version tag is pushed.
 #
-# Release flow:
+# Uses npm Trusted Publishing (OIDC) - no npm token or repository secret. The trusted publisher
+# configured on npmjs.com for the actor-debugger package is:
+#   repository: apify/actor-debugger
+#   workflow:   publish.yml   (this file name must match exactly, including the extension)
+# Provenance attestations are generated automatically by trusted publishing, and npm requires
+# package.json "repository.url" to point at this exact GitHub repository.
+#
+# Release flow (from the javascript/ directory):
 #   npm version patch        # bumps package.json, commits, and creates the v* tag
 #   git push --follow-tags
-#
-# Setup (one-time): create a granular npm access token with read/write on this
-# package (or "new packages" for the first publish) and save it as the
-# repository secret NPM_TOKEN.
-#
-# Note: `npm publish --provenance` is not used because it requires a public
-# repository. If the repo goes public, add `--provenance` to the publish step
-# and `id-token: write` to permissions.
 
 name: Publish to npm
 
@@ -18,6 +17,10 @@ on:
   push:
     tags:
       - 'v*'
+
+defaults:
+  run:
+    working-directory: javascript
 
 jobs:
   check:
@@ -27,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install dependencies
         run: npm ci
@@ -36,6 +39,7 @@ jobs:
         run: |
           node --check bin/cli.mjs
           node --check lib/debug_server.mjs
+          node --check lib/inline_sourcemaps.mjs
 
       - name: Verify tag matches package.json version
         run: |
@@ -50,7 +54,7 @@ jobs:
         run: |
           mkdir -p /tmp/smoke && cd /tmp/smoke
           echo 'console.log("smoke-ok")' > index.js
-          OUTPUT="$(node "$GITHUB_WORKSPACE/bin/cli.mjs" index.js 2>&1)"
+          OUTPUT="$(node "$GITHUB_WORKSPACE/javascript/bin/cli.mjs" index.js 2>&1)"
           echo "$OUTPUT"
           echo "$OUTPUT" | grep -q 'smoke-ok'
 
@@ -59,7 +63,7 @@ jobs:
           mkdir -p /tmp/smoke-debug && cd /tmp/smoke-debug
           echo 'setTimeout(() => console.log("done"), 15000)' > index.js
           ACTOR_WEB_SERVER_PORT=4321 ACTOR_WEB_SERVER_URL=http://localhost:4321 \
-            node "$GITHUB_WORKSPACE/bin/cli.mjs" index.js &
+            node "$GITHUB_WORKSPACE/javascript/bin/cli.mjs" index.js &
           CLI_PID=$!
           for i in $(seq 1 20); do
             sleep 0.5
@@ -75,19 +79,25 @@ jobs:
   publish:
     needs: check
     runs-on: ubuntu-latest
-    environment: npm
+    permissions:
+      id-token: write   # required for npm Trusted Publishing (OIDC)
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing needs npm >= 11.5.1; make sure the runner's npm is new enough.
+      - name: Update npm
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish
+      - name: Publish (trusted publishing)
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
