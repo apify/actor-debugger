@@ -1,5 +1,17 @@
 # actor-debugger (Python)
 
+**An in-browser Python debugger for the Apify platform.** Set breakpoints, step through your Actor,
+walk the call stack, inspect variables and evaluate expressions in the paused frame — in a browser
+tab, straight from the run detail in Apify Console. No IDE, no tunnel, no SSH, nothing to install
+on your machine.
+
+![Actor Debugger paused on a breakpoint in a Python Actor, shown in the Live view tab of a run in Apify Console: sources, call stack, variables and an evaluate prompt](https://raw.githubusercontent.com/apify/actor-debugger/master/python/docs/apify-console-live-view.png)
+
+*A Crawlee `BeautifulSoupCrawler` Actor paused on `await context.push_data(data)` in the **Live view**
+tab of its run in Apify Console. Sources on the left, call stack and locals on the right (the scraped
+`data` dict included), an evaluate prompt for the selected frame at the bottom, and Resume / Over /
+Into / Out plus "just my code" in the toolbar. Everything you see runs in the browser.*
+
 Drop-in remote debugging for **any Apify Python Actor** with a two-line Dockerfile change. It
 launches your Actor under **debugpy** (the debugger that powers VS Code's Python debugging) **and
 serves a full browser debugger UI over the run's container URL** — so you open one link in your
