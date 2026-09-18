@@ -125,22 +125,22 @@ bridge and frontend; only the adapter spawn command and entrypoint detection dif
 
 ## Releasing
 
-Publishing to PyPI is automated by
-[`.github/workflows/publish_to_pypi.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish_to_pypi.yml), which fires
-on `py-v*` tags and publishes via **PyPI Trusted Publishing** (OIDC) — no API token or repository
-secret. The trusted publisher configured on PyPI is: project `actor-debugger`, repository
-`apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay exactly
-that). To cut a release:
+Publishing to PyPI is done by
+[`.github/workflows/publish_to_pypi.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish_to_pypi.yml),
+started manually from the Actions tab. It publishes via **PyPI Trusted Publishing** (OIDC) — no API
+token or repository secret. The trusted publisher configured on PyPI is: project `actor-debugger`,
+repository `apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay
+exactly that). To cut a release:
 
-```bash
-# bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit, then:
-git tag py-v0.1.0
-git push --tags
-```
+1. Bump the version in `python/pyproject.toml` and `python/src/actor_debugger/__init__.py` in a
+   PR and merge it to `master`.
+2. Open **Actions → Publish to PyPI → Run workflow** on `master`.
 
-The workflow first installs the package, checks the tag matches the pyproject version, and smoke
-tests the CLI and the served debugger UI; only then does the publish job build sdist+wheel and
-upload.
+The workflow refuses to run on any other branch, if the two version strings disagree, or if that
+version is already on PyPI or its `py-vX.Y.Z` tag already exists. It then installs the package,
+smoke tests the CLI and the served debugger UI, builds sdist+wheel, uploads them, and finally
+**pushes the `py-vX.Y.Z` tag and creates the GitHub release** with generated notes. Do not create
+tags or releases by hand.
 
 ## Notes
 

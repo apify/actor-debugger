@@ -1,52 +1,82 @@
-# Publishes the Python actor-debugger package to PyPI when a py-v* tag is pushed.
+# Publishes the Python package in python/ to PyPI, then tags the commit and creates the GitHub
+# release. Started manually (Actions -> Publish to PyPI -> Run workflow) on master; the version it
+# publishes is whatever python/pyproject.toml carries on that commit.
 #
-# Uses PyPI Trusted Publishing (OIDC) - no API token or secret anywhere. The trusted
-# publisher on PyPI is configured as:
+# Release flow:
+#   1. Bump the version in python/pyproject.toml and python/src/actor_debugger/__init__.py in a
+#      PR and merge it to master.
+#   2. Actions -> Publish to PyPI -> Run workflow (branch: master).
+#   The workflow refuses to run if that version is already on PyPI or its py-v* tag already
+#   exists, so a re-run after a failure is safe. On success it publishes, pushes the py-vX.Y.Z tag
+#   and creates a GitHub release with generated notes - never create those by hand.
+#
+# Uses PyPI Trusted Publishing (OIDC) - no API token or secret anywhere. The trusted publisher on
+# PyPI is configured as:
 #   project:    actor-debugger
 #   repository: apify/actor-debugger
 #   workflow:   publish_to_pypi.yml   (this file name must match exactly)
-#
-# Release flow:
-#   (bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit)
-#   git tag py-vX.Y.Z && git push --tags
-#
-# Can also be started manually (Actions -> Publish to PyPI -> Run workflow); a manual run
-# skips the tag/version check and publishes whatever version pyproject.toml carries on the
-# chosen ref (PyPI rejects re-uploads of an existing version, so re-runs are safe).
 
 name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - 'py-v*'
   workflow_dispatch:
+
+# Never let two releases run at once (they would race on the same version/tag).
+concurrency:
+  group: publish-pypi
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: python
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: python
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Refuse to publish from anything but master
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo "Publish to PyPI must be started on master, got ${GITHUB_REF}" >&2
+          exit 1
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install package
-        run: pip install .
-
-      - name: Verify tag matches pyproject version
-        if: github.ref_type == 'tag'
+      - name: Read version from pyproject.toml
+        id: version
         run: |
-          PKG_VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
-          TAG_VERSION="${GITHUB_REF_NAME#py-v}"
-          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $PKG_VERSION" >&2
+          VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          INIT_VERSION="$(python -c "import re; print(re.search(r'__version__\s*=\s*[\"\']([^\"\']+)', open('src/actor_debugger/__init__.py').read()).group(1))")"
+          if [ "$VERSION" != "$INIT_VERSION" ]; then
+            echo "pyproject.toml version $VERSION does not match __init__.__version__ $INIT_VERSION" >&2
             exit 1
           fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the version is not published yet
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Ask PyPI for the released versions (fails loudly on a network error rather than
+          # silently treating the version as new).
+          PUBLISHED="$(curl -sSf https://pypi.org/pypi/actor-debugger/json)"
+          if python -c "import json,sys; sys.exit(0 if sys.argv[2] in json.loads(sys.argv[1])['releases'] else 1)" "$PUBLISHED" "$VERSION"; then
+            echo "actor-debugger ${VERSION} is already on PyPI - bump the version first" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/py-v${VERSION}" > /dev/null; then
+            echo "Tag py-v${VERSION} already exists - bump the version first" >&2
+            exit 1
+          fi
+
+      - name: Install package
+        run: pip install .
 
       - name: Smoke test (entrypoint runs and its output passes through)
         run: |
@@ -75,16 +105,21 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # required for PyPI Trusted Publishing (OIDC)
+      id-token: write   # PyPI Trusted Publishing (OIDC)
+      contents: write   # push the release tag and create the GitHub release
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: py-v${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history and tags, so the release notes start at the previous py-v* tag
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Build distributions
-        working-directory: python
         run: |
           pip install build
           python -m build
@@ -93,3 +128,22 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: python/dist
+
+      - name: Tag the release commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "actor-debugger $TAG (PyPI)"
+          git push origin "$TAG"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Previous PyPI release tag (py-v*, not the npm v* tags), if any, for the notes range.
+          PREV="$(git describe --tags --abbrev=0 --match 'py-v*' "${TAG}^" 2>/dev/null || true)"
+          if [ -n "$PREV" ]; then
+            gh release create "$TAG" --title "actor-debugger $TAG (PyPI)" --generate-notes --notes-start-tag "$PREV" --verify-tag
+          else
+            gh release create "$TAG" --title "actor-debugger $TAG (PyPI)" --generate-notes --verify-tag
+          fi
