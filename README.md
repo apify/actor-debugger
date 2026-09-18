@@ -19,9 +19,10 @@ frontend and bridges the debug protocol to it. The run log prints the URL to ope
 - [`javascript/`](javascript/) — the npm package (`bin/`, `lib/`), its README, and a sample TS Actor
   in `example-actor/`.
 - [`python/`](python/) — the PyPI package (`src/actor_debugger/`) and its README.
-- [`.github/workflows/`](.github/workflows/) — release automation: `publish.yml` publishes to npm on
-  `v*` tags, `publish_to_pypi.yml` publishes to PyPI on `py-v*` tags. Both use registry trusted
-  publishing (OIDC), so there are no publishing secrets in the repository.
+- [`.github/workflows/`](.github/workflows/) — release automation. `publish.yml` is started manually
+  and publishes the version in `javascript/package.json` to npm, then creates the `v*` tag and
+  GitHub release itself; `publish_to_pypi.yml` publishes to PyPI on `py-v*` tags. Both use registry
+  trusted publishing (OIDC), so there are no publishing secrets in the repository.
 
 ## Security
 

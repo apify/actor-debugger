@@ -1,4 +1,14 @@
-# Publishes the npm package in javascript/ when a version tag is pushed.
+# Publishes the npm package in javascript/ to npm, then tags the commit and creates the GitHub
+# release. Started manually (Actions -> Publish to npm -> Run workflow) on master; the version it
+# publishes is whatever javascript/package.json carries on that commit.
+#
+# Release flow:
+#   1. Bump the version in javascript/package.json in a PR (e.g. `npm version patch
+#      --no-git-tag-version` inside javascript/) and merge it to master.
+#   2. Actions -> Publish to npm -> Run workflow (branch: master).
+#   The workflow refuses to run if that version is already on npm or its v* tag already exists,
+#   so a re-run after a failure is safe. On success it publishes, pushes the vX.Y.Z tag and
+#   creates a GitHub release with generated notes - never create those by hand.
 #
 # Uses npm Trusted Publishing (OIDC) - no npm token or repository secret. The trusted publisher
 # configured on npmjs.com for the actor-debugger package is:
@@ -6,17 +16,16 @@
 #   workflow:   publish.yml   (this file name must match exactly, including the extension)
 # Provenance attestations are generated automatically by trusted publishing, and npm requires
 # package.json "repository.url" to point at this exact GitHub repository.
-#
-# Release flow (from the javascript/ directory):
-#   npm version patch        # bumps package.json, commits, and creates the v* tag
-#   git push --follow-tags
 
 name: Publish to npm
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+
+# Never let two releases run at once (they would race on the same version/tag).
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -25,7 +34,15 @@ defaults:
 jobs:
   check:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Refuse to publish from anything but master
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo "Publish to npm must be started on master, got ${GITHUB_REF}" >&2
+          exit 1
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -35,20 +52,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Read version from package.json
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the version is not published yet
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Ask the registry for the published versions (fails loudly on a registry/network error
+          # rather than silently treating the version as new).
+          PUBLISHED="$(npm view actor-debugger versions --json)"
+          if node -e 'process.exit(JSON.parse(process.argv[1]).includes(process.argv[2]) ? 0 : 1)' "$PUBLISHED" "$VERSION"; then
+            echo "actor-debugger@${VERSION} is already on npm - bump the version in package.json first" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" > /dev/null; then
+            echo "Tag v${VERSION} already exists - bump the version in package.json first" >&2
+            exit 1
+          fi
+
       - name: Syntax-check sources
         run: |
           node --check bin/cli.mjs
           node --check lib/debug_server.mjs
           node --check lib/inline_sourcemaps.mjs
-
-      - name: Verify tag matches package.json version
-        run: |
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION" >&2
-            exit 1
-          fi
 
       - name: Smoke test (entrypoint runs and its output passes through)
         run: |
@@ -80,10 +108,15 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # required for npm Trusted Publishing (OIDC)
-      contents: read
+      id-token: write   # npm Trusted Publishing (OIDC)
+      contents: write   # push the release tag and create the GitHub release
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history and tags, so the release notes start at the previous v* tag
 
       - uses: actions/setup-node@v4
         with:
@@ -101,3 +134,22 @@ jobs:
 
       - name: Publish (trusted publishing)
         run: npm publish
+
+      - name: Tag the release commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "actor-debugger $TAG (npm)"
+          git push origin "$TAG"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Previous npm release tag (v*, not the Python py-v* tags), if any, for the notes range.
+          PREV="$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)"
+          if [ -n "$PREV" ]; then
+            gh release create "$TAG" --title "actor-debugger $TAG (npm)" --generate-notes --notes-start-tag "$PREV" --verify-tag
+          else
+            gh release create "$TAG" --title "actor-debugger $TAG (npm)" --generate-notes --verify-tag
+          fi
