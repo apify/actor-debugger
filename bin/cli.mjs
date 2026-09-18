@@ -3,12 +3,17 @@
  * actor-debugger - launch an Apify Node/TS Actor under the Node inspector, reachable over the
  * run's container URL, with a one-line Dockerfile change:
  *
+ *   ENTRYPOINT ["actor-debugger", "--brk"]           # recommended: keeps the image's own CMD
  *   CMD ["npx", "actor-debugger"]                    # auto-detect the Actor's entrypoint
  *   CMD ["npx", "actor-debugger", "dist/x.js"]       # explicit entrypoint
  *   CMD ["npx", "actor-debugger", "--brk"]           # pause on the first line until attached
  *
- * Running through this command is what enables debugging - revert the CMD to the normal
- * entrypoint to turn it off.
+ * As ENTRYPOINT, Docker appends the image's original CMD to our arguments, so the Actor's real
+ * start command (`npm start`, `node dist/main.js`, ...) is honoured instead of guessed, and an
+ * ENTRYPOINT cannot be silently swallowed by one already defined in the Actor's Dockerfile.
+ *
+ * Running through this command is what enables debugging - revert the ENTRYPOINT/CMD to the
+ * normal entrypoint to turn it off.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -18,9 +23,12 @@ import path from 'node:path';
 
 import { startDebugServer } from '../lib/debug_server.mjs';
 import { inlineSourceMaps } from '../lib/inline_sourcemaps.mjs';
+import { resolveLaunch } from '../lib/resolve_launch.mjs';
 
 const INSPECTOR_PORT = 9229;
 const TAG = '[actor-debugger]';
+/** Our own flag; everything else on the command line belongs to the Actor. */
+const BRK_FLAG = '--brk';
 
 /** Locate chii's prebuilt Chrome DevTools frontend (chrome-devtools-frontend npm ships unbuilt source). */
 function findFrontendDir() {
@@ -35,24 +43,6 @@ function findFrontendDir() {
         } catch {
             // try next
         }
-    }
-    return null;
-}
-
-function resolveEntry(argEntry) {
-    if (argEntry) return path.resolve(argEntry);
-    const candidates = [];
-    try {
-        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-        const startMatch = pkg.scripts?.start && /node\s+(?:--\S+\s+)*(\S+)/.exec(pkg.scripts.start);
-        if (startMatch) candidates.push(startMatch[1]);
-        if (pkg.main) candidates.push(pkg.main);
-    } catch {
-        // no/invalid package.json - fall through to conventional paths
-    }
-    candidates.push('dist/main.js', 'dist/index.js', 'build/main.js', 'src/main.js', 'main.js', 'index.js');
-    for (const candidate of candidates) {
-        if (candidate && fs.existsSync(candidate)) return path.resolve(candidate);
     }
     return null;
 }
@@ -92,8 +82,8 @@ async function announce(webServerUrl, hasFrontend) {
     const base = webServerUrl.replace(/\/$/, '');
     const host = base.replace(/^https?:\/\//, '');
     // Match the WebSocket scheme to the container URL's scheme: the platform serves container URLs
-    // over https (-> wss), while the local dev stack serves plain http on localhost (-> ws). A wss
-    // attempt against a plain-http endpoint fails the TLS handshake and DevTools reports
+    // over https (-> wss), while the local dev stack serves plain http on localhost (-> ws).
+    // A wss attempt against a plain-http endpoint fails the TLS handshake and DevTools reports
     // "WebSocket disconnected". Chii picks the scheme from the query param name (ws= vs wss=).
     const wsScheme = base.startsWith('https://') ? 'wss' : 'ws';
     console.error('='.repeat(72));
@@ -108,13 +98,20 @@ async function announce(webServerUrl, hasFrontend) {
 }
 
 const args = process.argv.slice(2);
-const brk = args.includes('--brk');
-const entry = resolveEntry(args.find((a) => !a.startsWith('--')));
-if (!entry) {
-    console.error(`${TAG} could not find an Actor entrypoint. Pass one explicitly:`);
-    console.error(`${TAG}   CMD ["npx", "actor-debugger", "dist/main.js"]`);
+const brk = args.includes(BRK_FLAG);
+// Everything except our own flag is either an explicit entrypoint or - when we run as the image
+// ENTRYPOINT - the Actor's original CMD, appended by Docker.
+const command = args.filter((arg) => arg !== BRK_FLAG);
+
+const launch = resolveLaunch({ command });
+if (!launch.entry) {
+    console.error(`${TAG} ${launch.reason}.`);
+    console.error(`${TAG} pass the Actor's entrypoint explicitly, e.g.:`);
+    console.error(`${TAG}   ENTRYPOINT ["actor-debugger", "--brk", "dist/main.js"]`);
     process.exit(1);
 }
+const { entry, nodeFlags, scriptArgs, source } = launch;
+console.error(`${TAG} starting the Actor from ${source}.`);
 
 // A remote DevTools frontend cannot fetch file:// URLs, so external .map files (and the .ts
 // sources they reference) are unreachable to it. Inline them into the compiled files up front.
@@ -130,9 +127,12 @@ if (maps.inlined > 0) {
 }
 
 const inspectFlag = brk ? '--inspect-brk' : '--inspect';
-const nodeArgs = ['--enable-source-maps', `${inspectFlag}=127.0.0.1:${INSPECTOR_PORT}`];
+const nodeArgs = ['--enable-source-maps', `${inspectFlag}=127.0.0.1:${INSPECTOR_PORT}`, ...nodeFlags];
 
-const child = spawn(process.execPath, [...nodeArgs, entry], { stdio: 'inherit', env: process.env });
+const child = spawn(process.execPath, [...nodeArgs, entry, ...scriptArgs], {
+    stdio: 'inherit',
+    env: process.env,
+});
 
 let server;
 const { ACTOR_WEB_SERVER_PORT: port, ACTOR_WEB_SERVER_URL: url } = process.env;
