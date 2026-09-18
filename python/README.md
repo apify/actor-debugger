@@ -1,13 +1,25 @@
 # actor-debugger (Python)
 
+**An in-browser Python debugger for the Apify platform.** Set breakpoints, step through your Actor,
+walk the call stack, inspect variables and evaluate expressions in the paused frame — in a browser
+tab, straight from the run detail in Apify Console. No IDE, no tunnel, no SSH, nothing to install
+on your machine.
+
+![Actor Debugger paused on a breakpoint in a Python Actor, shown in the Live view tab of a run in Apify Console: sources, call stack, variables and an evaluate prompt](https://raw.githubusercontent.com/apify/actor-debugger/master/python/docs/apify-console-live-view.jpg)
+
+*A Crawlee `BeautifulSoupCrawler` Actor paused on `await context.push_data(data)` in the **Live view**
+tab of its run in Apify Console. Sources on the left, call stack and locals on the right (the scraped
+`data` dict included), an evaluate prompt for the selected frame at the bottom, and Resume / Over /
+Into / Out plus "just my code" in the toolbar. Everything you see runs in the browser.*
+
 Drop-in remote debugging for **any Apify Python Actor** with a two-line Dockerfile change. It
 launches your Actor under **debugpy** (the debugger that powers VS Code's Python debugging) **and
 serves a full browser debugger UI over the run's container URL** — so you open one link in your
 own browser and debug. No IDE, no tunnel, no local setup, no rebuild of your source, and **no
 browser or IDE inside the Actor**.
 
-This is the Python sibling of the Node/TS [`actor-debugger`](../README.md) npm package, injected
-the same way:
+This is the Python sibling of the Node/TS [`actor-debugger`](https://github.com/apify/actor-debugger/blob/master/javascript/README.md)
+npm package, injected the same way:
 
 ```dockerfile
 # Get the package
@@ -29,7 +41,7 @@ Open it: click line numbers to set breakpoints, step, inspect the call stack and
 evaluate expressions in the paused frame, break on exceptions. `--brk` pauses the Actor on its
 first line until you attach — drop it to let the Actor run and attach mid-flight instead.
 
-Until the package is published to PyPI, install it from the repository instead:
+To try unreleased changes, install straight from the repository instead:
 
 ```dockerfile
 RUN pip install "actor-debugger @ git+https://github.com/apify/actor-debugger.git@master#subdirectory=python"
@@ -84,16 +96,6 @@ used exactly as-is: the standard container web-server port is the only channel. 
 channel? `wss://<run>.runs.apify.net/dap` speaks DAP directly, one JSON message per WebSocket
 text frame — any DAP client can drive it.
 
-## Verified on the Apify platform
-
-The full loop has been exercised against a real platform run: the UI served over
-`https://<run>.runs.apify.net/ui/`, the `wss://…/dap` WebSocket passed the platform ingress, and
-a live run was attached, paused, and driven from a plain browser. Automated coverage in this
-repo: a protocol test drives a complete DAP session through the bridge (breakpoint, stack,
-scopes, variables, evaluate, resume, re-attach after disconnect), and a headless-Chromium test
-drives the real UI end to end (entry pause under `--brk`, gutter breakpoints, stepping,
-variables, in-frame evaluate, resume, re-attach after page reload), including idle sessions.
-
 ## Security
 
 The debug endpoint is **unauthenticated** — anyone who reaches the container URL can execute code
@@ -125,22 +127,22 @@ bridge and frontend; only the adapter spawn command and entrypoint detection dif
 
 ## Releasing
 
-Publishing to PyPI is automated by
-[`.github/workflows/publish_to_pypi.yml`](../.github/workflows/publish_to_pypi.yml), which fires
-on `py-v*` tags and publishes via **PyPI Trusted Publishing** (OIDC) — no API token or repository
-secret. The trusted publisher configured on PyPI is: project `actor-debugger`, repository
-`apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay exactly
-that). To cut a release:
+Publishing to PyPI is done by
+[`.github/workflows/publish_to_pypi.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish_to_pypi.yml),
+started manually from the Actions tab. It publishes via **PyPI Trusted Publishing** (OIDC) — no API
+token or repository secret. The trusted publisher configured on PyPI is: project `actor-debugger`,
+repository `apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay
+exactly that). To cut a release:
 
-```bash
-# bump version in python/pyproject.toml and python/src/actor_debugger/__init__.py, commit, then:
-git tag py-v0.1.0
-git push --tags
-```
+1. Bump the version in `python/pyproject.toml` and `python/src/actor_debugger/__init__.py` in a
+   PR and merge it to `master`.
+2. Open **Actions → Publish to PyPI → Run workflow** on `master`.
 
-The workflow first installs the package, checks the tag matches the pyproject version, and smoke
-tests the CLI and the served debugger UI; only then does the publish job build sdist+wheel and
-upload.
+The workflow refuses to run on any other branch, if the two version strings disagree, or if that
+version is already on PyPI or its `py-vX.Y.Z` tag already exists. It then installs the package,
+smoke tests the CLI and the served debugger UI, builds sdist+wheel, uploads them, and finally
+**pushes the `py-vX.Y.Z` tag and creates the GitHub release** with generated notes. Do not create
+tags or releases by hand.
 
 ## Notes
 

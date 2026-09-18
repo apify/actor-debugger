@@ -4,10 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "actor-debugger"
-version = "0.1.1"
+version = "0.1.2"
 description = "Drop-in remote debugging for Apify Python Actors: debugpy plus a browser debugger UI served over the run's container URL."
 readme = "README.md"
 license = { text = "Apache-2.0" }
+authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 requires-python = ">=3.9"
 dependencies = ["debugpy>=1.8"]
 keywords = ["apify", "actor", "debugger", "debugpy", "dap", "remote-debugging"]
@@ -19,7 +20,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/apify/actor-debugger"
+Homepage = "https://github.com/apify/actor-debugger/tree/master/python#readme"
+Repository = "https://github.com/apify/actor-debugger"
+"Issue Tracker" = "https://github.com/apify/actor-debugger/issues"
 
 [project.scripts]
 actor-debugger = "actor_debugger.cli:main"

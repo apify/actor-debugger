@@ -1,6 +1,6 @@
 {
     "name": "actor-debugger",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Drop-in remote debugger for Apify Node/TS Actors: one Dockerfile CMD line launches your Actor under the Node inspector, reachable over the run's container URL. No local setup, no rebuild of your own code.",
     "type": "module",
     "bin": {
@@ -16,12 +16,13 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/Pijukatel/actor-debugger.git"
+        "url": "git+https://github.com/apify/actor-debugger.git",
+        "directory": "javascript"
     },
     "bugs": {
-        "url": "https://github.com/Pijukatel/actor-debugger/issues"
+        "url": "https://github.com/apify/actor-debugger/issues"
     },
-    "homepage": "https://github.com/Pijukatel/actor-debugger#readme",
+    "homepage": "https://github.com/apify/actor-debugger/tree/master/javascript#readme",
     "keywords": [
         "apify",
         "actor",

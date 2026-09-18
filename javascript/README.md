@@ -1,0 +1,123 @@
+# actor-debugger (Node.js / TypeScript)
+
+> Looking for Python Actors? The same one-link browser debugging exists for Python, built on debugpy
+> plus a served DAP frontend — see
+> [`python/README.md`](https://github.com/apify/actor-debugger/blob/master/python/README.md).
+
+Drop-in remote debugging for **any Apify Node/TS Actor** with a one-line Dockerfile change. It
+launches your Actor under the Node inspector **and serves a full Chrome DevTools UI over the run's
+container URL** — so you open one link in your own browser and debug. No wstunnel, no local setup,
+no rebuild of your source, and **no browser in the Actor**.
+
+```dockerfile
+# Get the package
+RUN npm install actor-debugger
+
+# pause on the first line until a debugger attaches (for short-lived Actors):
+CMD ["npx", "actor-debugger", "--brk"]
+
+# or point at a specific entry:
+CMD ["npx", "actor-debugger", "dist/main.js"]
+```
+
+## How it works
+
+1. It resolves your Actor's entrypoint (see detection order below) and launches it as
+   `node --inspect=127.0.0.1:9229 <entry>` — so the inspector is on **your** code, in its own
+   process, exactly as it normally runs.
+2. It runs one HTTP server on `ACTOR_WEB_SERVER_PORT` that:
+   - **serves the Chrome DevTools frontend** (static files) so your *local* browser opens it — no
+     Chrome, Xvfb, or VNC in the Actor;
+   - **proxies the CDP WebSocket** to the inspector, rewriting `Host` to a loopback IP and dropping
+     `Origin`. Node's inspector rejects DNS-name hosts (anti-DNS-rebinding), so this rewrite is
+     what lets a browser reach it over `<run>.runs.apify.net`.
+3. The run log prints one URL. Open it in your browser → real DevTools attached to your Actor.
+
+The DevTools frontend comes from **[`chii`](https://github.com/liriliri/chii)** (MIT), which ships
+a *prebuilt* Chrome DevTools frontend. The `chrome-devtools-frontend` npm package is unbuilt
+TypeScript source (needs Chromium's GN/ninja toolchain to compile), so it can't be served as-is —
+chii's build is the same frontend, ready to serve.
+
+## Activation
+
+Running the Actor through `npx actor-debugger` **is** the switch — debugging is on whenever the
+`CMD` line above is in place. To turn it off, revert the `CMD` to the Actor's normal entrypoint
+(e.g. `CMD ["npm", "start"]`) and rebuild. Pass `--brk` to pause on the first line until a
+debugger attaches — useful for Actors that would otherwise finish before you connect.
+
+## Connect
+
+Open the URL the run log prints, in your own browser:
+
+```
+https://<run>.runs.apify.net/devtools/js_app.html?wss=<run>.runs.apify.net/<uuid>
+```
+
+That page **is** Chrome DevTools; it connects to your Actor over the container URL. Set breakpoints
+in your sources (via source maps), step, inspect — no `devtools://` URL, no local install.
+Prefer the raw channel? `npx wscat -c "wss://<run>.runs.apify.net/<uuid>"`, or point
+`Playwright/Puppeteer connectOverCDP` at that wss URL.
+
+The WebSocket scheme in the printed URL follows the container URL's scheme: `wss` on the platform
+(https container URLs), plain `ws` on a local Apify dev stack (http on localhost). Always use the
+URL exactly as printed in the run log.
+
+## TypeScript sources (automatic)
+
+A remote DevTools frontend can never fetch `file://` URLs from the container, so external
+`.js.map` files — the standard `"sourceMap": true` tsc output — are unreachable to it, and
+DevTools would fall back to the generated JS ("Source map failed to load"). The debugger fixes
+this itself at startup: it scans the compiled output, reads each external `.map` from the
+container's disk, embeds the original TS text into it (`sourcesContent`, read from the `.ts`
+files in the image), and rewrites the reference into an inline `data:` URL. Any tsc setup that
+emits source maps at all (`sourceMap` or `inlineSourceMap`) therefore just works — no tsconfig
+changes needed.
+
+The one unrecoverable case is a build with no source maps: then the run log prints a hint to
+compile with `"sourceMap": true`. If the `.ts` files aren't in the image (a multi-stage build
+copying only `dist/`), mappings still inline but sources can't be shown — the log says so; `COPY`
+your `src/` into the final stage to fix it.
+
+## Entrypoint detection order
+
+1. An explicit path argument, if given.
+2. The file in `package.json` `scripts.start` (e.g. `node dist/main.js` → `dist/main.js`).
+3. `package.json` `main`.
+4. Conventional paths: `dist/main.js`, `dist/index.js`, `build/main.js`, `src/main.js`, `main.js`, `index.js`.
+
+## Security
+
+The debug endpoint is **unauthenticated** — anyone who reaches the container URL and the run's
+`uuid` can execute code in your run (and read its env, including `APIFY_TOKEN`). Keep the
+`actor-debugger` `CMD` only in builds you are actively debugging, prefer a restricted run/token,
+never ship it in a published Actor, and gate the endpoint (owner-only) before any non-prototype
+use.
+
+## Releasing
+
+Publishing to npm is done by
+[`.github/workflows/publish.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish.yml),
+started manually from the Actions tab. It publishes via **npm Trusted Publishing** (OIDC) — no npm
+token or repository secret, and provenance attestations are generated automatically. The trusted
+publisher configured on npmjs.com is: repository `apify/actor-debugger`, workflow `publish.yml`
+(the workflow file name must stay exactly that). To cut a release:
+
+1. Bump the version in `javascript/package.json` in a PR and merge it to `master`:
+
+   ```bash
+   cd javascript
+   npm version patch --no-git-tag-version   # or minor / major
+   ```
+
+2. Open **Actions → Publish to npm → Run workflow** on `master`.
+
+The workflow refuses to run on any other branch, or if that version is already on npm or its
+`vX.Y.Z` tag already exists. It then syntax-checks the sources, smoke-tests both modes (disabled
+pass-through and the debug server with `/json/list` + DevTools frontend), checks the pack contents,
+runs `npm publish` from `javascript/`, and finally **pushes the `vX.Y.Z` tag and creates the GitHub
+release** with generated notes. Do not create tags or releases by hand.
+
+## Notes
+
+- Depends on `chii` for the prebuilt DevTools frontend (~16 MB of static assets, no runtime browser).
+- Pure Node otherwise — works on any `apify/actor-node*` base image, no Xvfb / Chrome / apt.
