@@ -93,23 +93,6 @@ The debug endpoint is **unauthenticated** — anyone who reaches the container U
 never ship it in a published Actor, and gate the endpoint (owner-only) before any non-prototype
 use.
 
-## Verified
-
-Tested end-to-end against a **browserless** generic sample TS Actor (`example-actor/`, plain
-`apify/actor-node`, no Chrome):
-
-- The one-line `CMD` detects the entrypoint and runs the Actor under `--inspect`; explicit path
-  and auto-detect modes both pass.
-- `/devtools/js_app.html` and its assets are served (200); `/json` is proxied; a CDP client
-  round-trips `Runtime.evaluate` through the proxy with browser-like `Host`/`Origin`.
-- **Headless Chromium loaded the served DevTools frontend and the Node inspector reported
-  "Debugger attached"** — i.e. the served Chrome DevTools UI genuinely connects to the Actor with no
-  browser in the image.
-
-One thing to confirm on real infrastructure: the frontend's `wss://` connection through Apify's
-ingress when the ingress negotiates HTTP/2 (WebSocket-over-h2). See the sibling
-`typescript-debug-browser` handoff for the `curl --http1.1` probe that settles it.
-
 ## Releasing
 
 Publishing to npm is done by

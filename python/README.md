@@ -84,16 +84,6 @@ used exactly as-is: the standard container web-server port is the only channel. 
 channel? `wss://<run>.runs.apify.net/dap` speaks DAP directly, one JSON message per WebSocket
 text frame — any DAP client can drive it.
 
-## Verified on the Apify platform
-
-The full loop has been exercised against a real platform run: the UI served over
-`https://<run>.runs.apify.net/ui/`, the `wss://…/dap` WebSocket passed the platform ingress, and
-a live run was attached, paused, and driven from a plain browser. Automated coverage in this
-repo: a protocol test drives a complete DAP session through the bridge (breakpoint, stack,
-scopes, variables, evaluate, resume, re-attach after disconnect), and a headless-Chromium test
-drives the real UI end to end (entry pause under `--brk`, gutter breakpoints, stepping,
-variables, in-frame evaluate, resume, re-attach after page reload), including idle sessions.
-
 ## Security
 
 The debug endpoint is **unauthenticated** — anyone who reaches the container URL can execute code
