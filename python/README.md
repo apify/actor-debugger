@@ -105,45 +105,6 @@ a restricted run/token, never ship it in a published Actor, and gate the endpoin
 before any non-prototype use. This matches the security posture of the Node version; both need
 the same hardening pass.
 
-## Design notes: the routes considered
-
-The constraint was: **no platform/infrastructure changes, and nothing but a browser on the
-debugging machine.** Everything must therefore run inside the Actor container and be served over
-the one exposed web-server port. Options considered:
-
-| Approach | Verdict |
-| --- | --- |
-| **debugpy + served browser DAP client** (this package) | CPython unchanged, actor code and deps run exactly as in production; debugpy is the canonical Python debugger; image cost ~3 MB. The UI is ours to grow. **Chosen.** |
-| **GraalPy `--inspect`** — GraalVM's Python speaks the Chrome DevTools Protocol natively, so the Node version's chii DevTools frontend + CDP proxy would work *unchanged* | Elegant symmetry, but it swaps the runtime under the Actor: a different base image, slower startup, and C-extension compatibility risk for real-world deps (`lxml`, `pydantic`, `cryptography`, …). Debugging a different interpreter than production undermines the point. |
-| **DAP→CDP translation shim** — keep CPython + debugpy, translate DAP into the Chrome DevTools Protocol and serve the same chii DevTools frontend the Node version uses | Best possible UI for free, one frontend for both languages, but the DevTools frontend is picky about `Debugger`/`Runtime` lifecycle — a meaningful project on its own. The `/dap` WebSocket this package exposes is where such a shim would slot in later. |
-| **code-server / openvscode-server in the container** | Great UX, zero custom code, but ~300 MB and a Node runtime in every Python Actor image, plus auth wiring. Overkill for "set a breakpoint in a run". |
-| **`web-pdb` / xterm.js + pdb over WebSocket** | Tiny, but a terminal `pdb` UX (no gutter breakpoints, no variable tree) and pdb can't attach to a running program the way debugpy can. |
-| **Jupyter server in the container** (JupyterLab's debugger also speaks debugpy) | The kernel model doesn't fit debugging an already-running script; heavyweight. |
-| **[`dap-python`](https://pypi.org/project/dap-python/)** — a typed Python DAP *client* library | The DAP client here is the browser; the container side is a protocol-agnostic byte bridge. Useful only for a server-orchestrated variant, at the cost of a Pydantic dependency and a Python ≥3.12 floor. |
-
-The same architecture extends beyond Python: any language with a DAP adapter (Node via js-debug,
-Go via Delve — which speaks DAP natively — Rust via lldb-dap, …) can sit behind the identical
-bridge and frontend; only the adapter spawn command and entrypoint detection differ.
-
-## Releasing
-
-Publishing to PyPI is done by
-[`.github/workflows/publish_to_pypi.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish_to_pypi.yml),
-started manually from the Actions tab. It publishes via **PyPI Trusted Publishing** (OIDC) — no API
-token or repository secret. The trusted publisher configured on PyPI is: project `actor-debugger`,
-repository `apify/actor-debugger`, workflow `publish_to_pypi.yml` (the workflow file name must stay
-exactly that). To cut a release:
-
-1. Bump the version in `python/pyproject.toml` and `python/src/actor_debugger/__init__.py` in a
-   PR and merge it to `master`.
-2. Open **Actions → Publish to PyPI → Run workflow** on `master`.
-
-The workflow refuses to run on any other branch, if the two version strings disagree, or if that
-version is already on PyPI or its `py-vX.Y.Z` tag already exists. It then installs the package,
-smoke tests the CLI and the served debugger UI, builds sdist+wheel, uploads them, and finally
-**pushes the `py-vX.Y.Z` tag and creates the GitHub release** with generated notes. Do not create
-tags or releases by hand.
-
 ## Notes
 
 - Only runtime dependency is `debugpy`; the HTTP server and the RFC 6455 WebSocket implementation

@@ -93,30 +93,6 @@ The debug endpoint is **unauthenticated** — anyone who reaches the container U
 never ship it in a published Actor, and gate the endpoint (owner-only) before any non-prototype
 use.
 
-## Releasing
-
-Publishing to npm is done by
-[`.github/workflows/publish.yml`](https://github.com/apify/actor-debugger/blob/master/.github/workflows/publish.yml),
-started manually from the Actions tab. It publishes via **npm Trusted Publishing** (OIDC) — no npm
-token or repository secret, and provenance attestations are generated automatically. The trusted
-publisher configured on npmjs.com is: repository `apify/actor-debugger`, workflow `publish.yml`
-(the workflow file name must stay exactly that). To cut a release:
-
-1. Bump the version in `javascript/package.json` in a PR and merge it to `master`:
-
-   ```bash
-   cd javascript
-   npm version patch --no-git-tag-version   # or minor / major
-   ```
-
-2. Open **Actions → Publish to npm → Run workflow** on `master`.
-
-The workflow refuses to run on any other branch, or if that version is already on npm or its
-`vX.Y.Z` tag already exists. It then syntax-checks the sources, smoke-tests both modes (disabled
-pass-through and the debug server with `/json/list` + DevTools frontend), checks the pack contents,
-runs `npm publish` from `javascript/`, and finally **pushes the `vX.Y.Z` tag and creates the GitHub
-release** with generated notes. Do not create tags or releases by hand.
-
 ## Notes
 
 - Depends on `chii` for the prebuilt DevTools frontend (~16 MB of static assets, no runtime browser).
