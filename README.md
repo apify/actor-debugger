@@ -20,11 +20,6 @@ The debug endpoint is unauthenticated: anyone who reaches the container URL can 
 run and read its environment, including `APIFY_TOKEN`. Keep the debugger `CMD` only in builds you are
 actively debugging, and never ship it in a published Actor. See each README for details.
 
-## Contributing
-
-Repository layout and the release process are described in
-[`CONTRIBUTING.md`](CONTRIBUTING.md).
-
 ## License
 
 Apache-2.0 — see [`LICENSE`](LICENSE).
