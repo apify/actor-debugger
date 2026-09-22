@@ -14,18 +14,6 @@ Both variants share the same architecture: your Actor runs under its native debu
 inspector, or debugpy for Python), and one HTTP server on `ACTOR_WEB_SERVER_PORT` serves the
 frontend and bridges the debug protocol to it. The run log prints the URL to open.
 
-## Repository layout
-
-- [`javascript/`](javascript/) — the npm package (`bin/`, `lib/`), its README, and a sample TS Actor
-  in `example-actor/`.
-- [`python/`](python/) — the PyPI package (`src/actor_debugger/`) and its README.
-- [`.github/workflows/`](.github/workflows/) — release automation. Both workflows are started
-  manually from the Actions tab on `master`: `publish.yml` publishes the version in
-  `javascript/package.json` to npm and `publish_to_pypi.yml` the version in `python/pyproject.toml`
-  to PyPI. Each then creates its tag (`vX.Y.Z` for npm, `py-vX.Y.Z` for PyPI) and GitHub release
-  itself. Both use registry trusted publishing (OIDC), so there are no publishing secrets in the
-  repository.
-
 ## Security
 
 The debug endpoint is unauthenticated: anyone who reaches the container URL can execute code in the
