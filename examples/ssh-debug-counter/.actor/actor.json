@@ -1,0 +1,10 @@
+{
+    "actorSpecification": 1,
+    "name": "ssh-debug-counter",
+    "title": "SSH debug counter (remote shell prototype)",
+    "description": "Counts from 1 to 100, one tick per second. With debug=true it opens an SSH session into the running container over the run's own container URL, reachable with nothing but the ssh and openssl already on your machine.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "dockerfile": "../Dockerfile",
+    "input": "./input_schema.json"
+}

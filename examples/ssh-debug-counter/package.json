@@ -1,0 +1,21 @@
+{
+    "name": "ssh-debug-counter",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Sample Actor: counts to 100, optionally with a live SSH session into the running container.",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/main.js"
+    },
+    "dependencies": {
+        "apify": "^3.7.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.6.0"
+    }
+}

@@ -14,6 +14,13 @@ Both variants share the same architecture: your Actor runs under its native debu
 inspector, or debugpy for Python), and one HTTP server on `ACTOR_WEB_SERVER_PORT` serves the
 frontend and bridges the debug protocol to it. The run log prints the URL to open.
 
+## Examples
+
+[`examples/ssh-debug-counter`](examples/ssh-debug-counter/README.md) is a standalone sample Actor
+that takes the same "one port, over the container URL" idea in a different direction: instead of a
+debugger UI, it serves an SSH session. It needs no tunnel client either — you connect with the
+`ssh` and `openssl` already on your machine.
+
 ## Security
 
 The debug endpoint is unauthenticated: anyone who reaches the container URL can execute code in the

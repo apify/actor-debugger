@@ -1,0 +1,27 @@
+{
+    "title": "SSH debug counter",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "debug": {
+            "title": "Enable SSH access",
+            "type": "boolean",
+            "description": "Start an sshd inside the run and expose it over this run's container URL (SSH-over-WebSocket). The run log then prints the exact ~/.ssh/config block to paste. Never enable on production runs.",
+            "default": false
+        },
+        "sshPublicKey": {
+            "title": "Your SSH public key",
+            "type": "string",
+            "editor": "textfield",
+            "description": "Required when debug is on. One OpenSSH public key line, e.g. the contents of ~/.ssh/id_ed25519.pub. This is the only credential that grants the session - password login is off.",
+            "prefill": "ssh-ed25519 AAAA... you@laptop"
+        },
+        "waitForConnection": {
+            "title": "Block until you connect",
+            "type": "boolean",
+            "description": "With debug on, pause before counting until an SSH session attaches (no timeout - the run timeout is the safety net; abort the run if you change your mind). Turn off to start counting immediately and connect mid-run.",
+            "default": true
+        }
+    },
+    "required": ["debug"]
+}
