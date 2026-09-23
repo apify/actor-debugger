@@ -52,7 +52,8 @@ export function startSshd({ port, authorizedKey }: SshdOptions): Sshd {
             'KbdInteractiveAuthentication no',
             'PubkeyAuthentication yes',
             `AuthorizedKeysFile ${AUTHORIZED_KEYS_PATH}`,
-            'UsePAM no',
+            // No UsePAM here: Alpine's sshd is built without PAM and logs "Unsupported option"
+            // for it. Password and keyboard-interactive auth are already off above.
             'X11Forwarding no',
             'PrintMotd no',
             'PidFile /run/sshd.actor-debug.pid',
