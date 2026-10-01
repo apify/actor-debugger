@@ -2,7 +2,7 @@
 
 Drop-in remote debugging for Apify Actors: a one-line `CMD` change in the Dockerfile launches the
 Actor under a debugger and serves a full debugger UI over the run's container URL. Open one link in
-your own browser and debug — no local setup, no tunnel, no rebuild of your code, no browser or IDE
+your own browser and debug — no local setup, no tunnel, no browser or IDE
 inside the Actor.
 
 | Runtime | Package | Integration | Details |
