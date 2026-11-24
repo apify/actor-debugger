@@ -43,9 +43,9 @@ jobs:
           echo "Publish to npm must be started on master, got ${GITHUB_REF}" >&2
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 24
 
@@ -114,11 +114,11 @@ jobs:
       VERSION: ${{ needs.check.outputs.version }}
       TAG: v${{ needs.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           fetch-depth: 0   # full history and tags, so the release notes start at the previous v* tag
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'

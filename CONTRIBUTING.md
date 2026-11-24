@@ -57,3 +57,7 @@ The workflow refuses to run on any other branch, if the two version strings disa
 version is already on PyPI or its `py-vX.Y.Z` tag already exists. It then installs the package,
 smoke tests the CLI and the served debugger UI, builds sdist+wheel, uploads them, and finally
 **pushes the `py-vX.Y.Z` tag and creates the GitHub release** with generated notes.
+
+## GitHub Actions
+
+Workflows reference actions by version tag (`actions/checkout@v7.0.1`), never by commit SHA. [`.github/workflows/actions.lock`](.github/workflows/actions.lock) pins every tag, including those called by composite actions, to its commit. After adding or changing a `uses:` line, run `gh actions-lock` ([extension](https://github.com/github/gh-actions-lock)) and commit the lockfile. Prefer composite actions from `apify/actions` over reusable workflows from `apify/workflows`, which the lockfile can't pin.
